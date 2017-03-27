@@ -1,49 +1,30 @@
+require('dotenv').load();
+
 var restify = require('restify');
 var builder = require('botbuilder');
-//.env 파일에 환경설정함. process.env.NODE_ENV 등등
-require('dotenv').config()
- 
-//=========================================================
-// Bot Setup
-//=========================================================
+var rp = require('request-promise');
 
 // Setup Restify Server
 var server = restify.createServer();
 server.use(restify.CORS()); 
+server.use(restify.bodyParser()); 
+
 server.listen(process.env.port || process.env.PORT || 3978, function () {
    console.log('%s listening to %s', server.name, server.url); 
-}); 
-  
+});
+
 // Create chat bot
 var connector = new builder.ChatConnector({
     appId: process.env.MICROSOFT_APP_ID,
     appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
-var bot = new builder.UniversalBot(connector);
 server.post('/api/messages', connector.listen());
 
-//=========================================================
-// Bots Dialogs
-//=========================================================
+var bot = new builder.UniversalBot(connector);
 
-// var pizzaNameEntity=null;
-// var quantityEntity=null;
-// var sizeEntity=null;
-// var statusCode = {
-    
-// }
-
-
-// Make sure you add code to validate these fields
-var luisAppId = process.env.LuisAppId;
-var luisAPIKey = process.env.LuisAPIKey;
-var luisAPIHostName = process.env.LuisAPIHostName || 'westus.api.cognitive.microsoft.com';
-const LuisModelUrl = "https://"+luisAPIHostName+"/luis/v2.0/apps/"+luisAppId+"?subscription-key="+luisAPIKey+"&verbose=true&q=";
-// Main dialog with LUIS
-var recognizer = new builder.LuisRecognizer(LuisModelUrl);
+// Setup LUIS
+var recognizer = new builder.LuisRecognizer(process.env.LUIS_MODEL_URL);
 var intents = new builder.IntentDialog({ recognizers: [recognizer] })
-
-
 .onDefault((session) => {
     session.send('Sorry, I did not understand \'%s\'.', session.message.text);
 })
@@ -65,6 +46,7 @@ var intents = new builder.IntentDialog({ recognizers: [recognizer] })
           quantity : quantityEntity ? quantityEntity.entity : null
         };
         console.log("order : "+order.pizzaName+","+order.size+","+order.quantity);
+
 
 
         if (!order.pizzaName) {
@@ -89,6 +71,61 @@ var intents = new builder.IntentDialog({ recognizers: [recognizer] })
         if (results.response) {
             order.pizzaName = results.response;
         }       
+
+        //외부 api 호출
+        // var url = "process.env.PIZZAINFO_LOCAL_URL";
+        // var url = "process.env.PIZZAINFO_PROD_URL";
+        
+        
+        var url = process.env.PIZZAINFO_LOCAL_URL+order.pizzaName;
+        // var url = process.env.PIZZAINFO_LOCAL_URL+"콤비네이션피자";
+        // var url = process.env.PIZZAINFO_LOCAL_URL+"콤비네이션피자";
+        console.log("url : "+url);
+        
+
+
+        var options = {
+            uri: url,
+            method: 'GET',
+            json: true // Automatically parses the JSON string in the response 
+        };
+        
+        rp(options)
+            .then(function (repos) {
+                console.log('User has %d repos', repos.length);
+                session.send(repos);
+            })
+            .catch(function (err) {
+                // API call failed... 
+                session.send("api 서버 오류 발생!!");
+                console.log("err!!!!!! : "+err);
+            });
+
+
+
+
+
+
+
+
+
+        // request(url, function (error, response, body) {
+        //     var body = JSON.parse(body);
+        //     if (!error && response.statusCode == 200) {
+        //         if(body.resultCode == "NODATA"){
+        //             //잘못입력했거나, 없는 데이터일 경우 머신러닝 가능한지 추후에 조사.
+        //             session.send(body.resultDesc)
+        //         }else{
+        //             //정상 데이터 편집 필요.
+        //             session.send(body);
+        //         }
+        //     }else{
+        //         session.send("api 서버 오류 발생!!");
+        //         session.endDialog();
+        //     }
+        // });
+            
+
 
         if (order.pizzaName && !order.size) {
             builder.Prompts.text(session, '사이즈는 어떤걸로 할까요?');
