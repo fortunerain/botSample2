@@ -35,7 +35,7 @@ function jsonFormatter(data){
     for (var key in data){
         console.log( key + ": " + data[key]);
         //개행안됨.
-        result += key + ": " + data[key] +"\r\n";
+        result += key + ": " + data[key] +"\n\n";
     }
 
     return result;
